@@ -1,4 +1,4 @@
-use crate::nouns::{ Noun, content };
+use crate::nouns::{ Noun, Content };
 use ramp::int::Int;
 use std::rc::Rc;
 use std::collections::HashMap;
@@ -17,13 +17,14 @@ pub fn cuer(mut jam: Jam, map: &mut HashMap<usize, Noun>) -> (Jam, Noun) { //Add
    if jam.bit() {
        jam.advance();
        if jam.bit() {
-           jam.advance();
+           //jam.advance();
            //Backref
-           println!("Backref");
-           let (jam, atom) = rub(jam);
+           println!("Backref Pos {}", start);
+           let (mut jam, atom) = rub(jam);
+           println!("Backref {}", atom);
            let b_ref;
-           if let content::Atom(int) = atom.content {
-               //println!("Backref Res: {}", (int.to_f64() as usize));
+           if let Content::Atom(int) = atom.content {
+               println!("Backref Res: {}", (int.to_f64() as usize));
                let ref_opt = map.get(&(int.to_f64() as usize));
                if let Some(bref) = ref_opt {
                    b_ref = bref.clone()
@@ -44,43 +45,44 @@ pub fn cuer(mut jam: Jam, map: &mut HashMap<usize, Noun>) -> (Jam, Noun) { //Add
        {
            jam.advance();
            //cell
-           println!("Cell");
+           println!("Cell Pos {}", start);
            let (jam, p) = cuer(jam, map);
            let (jam, q) = cuer(jam, map);
            let cell = Noun {
                hash: 127237123,
-               content: content::Cell(Rc::new(p), Rc::new(q)),
+               content: Content::Cell(Rc::new(p), Rc::new(q)),
            };
            //println!("Cell Res: {}", cell.str_format());
+           println!("Cell start {}", start);
            map.insert(start, cell.clone());
            (jam, cell)
        }
    }
    else {
        //Atom
-       println!("Atom");
-       println!("Pos: {}", jam.pos /8);
-       jam.advance();
+       println!("Atom Pos: {}", start);
+       //jam.advance();
        let (jam, atom) = rub(jam);
        map.insert(start, atom.clone());
-       //println!("Atom Res{}", atom.str_format());
+       println!("Atom Res {}", atom);
+       //jam.advance();
        (jam, atom)
    }
 }
 pub fn rub(mut jam: Jam) -> (Jam, Noun) {
 
+   jam.advance(); 
    let mut leading_zeroes = 0;
    //let mut res: u128 = 0;
    let mut noun = Noun {
        hash: 12321641,
-       content: content::Atom(Int::zero()),
+       content: Content::Atom(Int::zero()),
    };
    //Atom
    ////println!("Atom");
    //Count num zeroes
    while !jam.bit() {
        leading_zeroes += 1;
-       println!("{}", leading_zeroes);
        jam.advance();
    }
 
@@ -90,26 +92,35 @@ pub fn rub(mut jam: Jam) -> (Jam, Noun) {
        return (jam, Noun::atom_from_u32(0));
    }
 
-   //read z
+   //read
    let x = (2 as usize).pow(leading_zeroes - 1);
-   println!("Bex: {}", x);
+   println!("Bex: {} {}",leading_zeroes, x);
    let mut z = 0;
    for i in 0..(leading_zeroes - 1) {
         if jam.bit() {
             z += 1 << i;
         }
-        jam.advance();
-   }
-   ////println!("X: {} Z: {}", x, z);
-   for i in 0..(x + z) {
-        if jam.bit() {
-            if let content::Atom(int) = noun.content {
-                ////println!("I: {}", i);
-                noun.content = content::Atom(int + (Int::one() << i));
-            }
-        }
         jam.advance()
    }
+
+   //Read the value of the jam
+   //TODO THIS IS NOT GOOD
+   let mut result = Int::zero();
+   for i in 0..(x + z) {
+        /*if jam.bit() {
+            if let content::Atom(int) = noun.content {
+                println!("I: {}", i);
+                noun.content = content::Atom(int + (Int::one() << i));
+            }
+        }*/
+        if jam.bit() {
+//            println!("I: {}", i);
+            result += (Int::one() << i)
+        }
+        jam.advance();
+   }
+   noun.content = Content::Atom(result);
+
    (jam, noun)
 }
 impl Jam {
@@ -123,3 +134,4 @@ impl Jam {
 fn bit(stream: &Vec<u8>, pos: usize) -> bool {
     stream[pos / 8] & (1 << (pos % 8)) != 0 //Access bit pos of stream, little endian
 }
+
