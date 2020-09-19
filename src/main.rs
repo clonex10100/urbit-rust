@@ -43,14 +43,15 @@ fn read_pill() -> io::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use crate::nouns::{Noun, Content};
-    use crate::nock::nock;
+    use crate::nock::{nock, NockError};
     use std::rc::Rc;
     use ramp::int::Int;
     fn test_nock(subject: &str, formula: &str, output: &str) {
         let subject = subject.parse::<Noun>().unwrap();
         let formula = formula.parse::<Noun>().unwrap();
+        //let res = nock(Rc::new(subject), Rc::new(formula))?;
         let res = nock(Rc::new(subject), Rc::new(formula));
-        assert_eq!(format!("{}", res), output);
+        assert_eq!(format!("{}", res.unwrap()), output);
     }
     #[test]
     fn test_noun() {

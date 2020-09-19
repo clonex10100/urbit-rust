@@ -47,81 +47,100 @@ nock(a)             *a
 *a                  *a*/
 use crate::nouns::{Noun, Content};
 use std::rc::Rc;
+use std::error::Error;
+use std::fmt;
 
-pub fn nock(subject: Rc<Noun>, formula: Rc<Noun>) -> Rc<Noun> {
+#[derive(Debug)]
+pub struct NockError {
+    msg: String,
+}
+
+impl fmt::Display for NockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl Error for NockError {
+}
+
+pub fn nock(subject: Rc<Noun>, formula: Rc<Noun>) -> Result<Rc<Noun>, NockError> {
     if let Content::Cell(op, var) = &formula.content {
         if let Content::Atom(op) = &op.content {
             match op.to_f64() as usize {
-                0 => subject.at(Rc::clone(var)),
-                1 => Rc::clone(var),
+                0 => Ok(subject.at(Rc::clone(var))),
+                1 => Ok(Rc::clone(var)),
                 2 => {
                     if let Content::Cell(b, c) = &var.content {
-                        let formula = nock(Rc::clone(&subject), Rc::clone(c));
-                        let subject = nock(subject, Rc::clone(b));
+                        let formula = nock(Rc::clone(&subject), Rc::clone(c))?;
+                        let subject = nock(subject, Rc::clone(b))?;
                         nock(subject, formula)
                     }
                     else {
-                        panic!("Invalid arguments for 2");
+                        Err(NockError{
+                            msg: "2".to_string(),
+                        })
                     }
                 }
                 3 => {
-                    match nock(subject, Rc::clone(var)).content {
-                        Content::Cell(_, _) => Rc::new(Noun::atom_from_u32(0)),
-                        _ =>  Rc::new(Noun::atom_from_u32(1)),
+                    match nock(subject, Rc::clone(var))?.content {
+                        Content::Cell(_, _) => Ok(Rc::new(Noun::atom_from_u32(0))),
+                        _ =>  Ok(Rc::new(Noun::atom_from_u32(1))),
 
                     }
                 }
                 4 => {
-                    let result = nock(subject, Rc::clone(var)) ;
+                    let result = nock(subject, Rc::clone(var))? ;
                     if let Content::Atom(int) = &result.content {
-                        Noun::from_ramp(int + 1)
+                        Ok(Noun::from_ramp(int + 1))
                         
                     } else {
-                        panic!("Can't Inc cell")
+                        Err(NockError{
+                            msg: "4".to_string(),
+                        })
                     }
                 }
                 5 => {
                     if let Content::Cell(a, b) = &var.content {
-                        let a = nock(Rc::clone(&subject), Rc::clone(a));
-                        let b = nock(subject, Rc::clone(b));
+                        let a = nock(Rc::clone(&subject), Rc::clone(a))?;
+                        let b = nock(subject, Rc::clone(b))?;
                         if a == b {
-                            Rc::new(Noun::atom_from_u32(0))
+                            Ok(Rc::new(Noun::atom_from_u32(0)))
                         } else {
-                            Rc::new(Noun::atom_from_u32(1))
+                            Ok(Rc::new(Noun::atom_from_u32(1)))
                         }
                     }
                     else {
-                        panic!("Invalid 5");
+                        Err(NockError{
+                            msg: "5".to_string(),
+                        })
                     }
                 }
                 6 => {
                     if let Content::Cell(a, b) = &var.content {
-                        let a = nock(Rc::clone(&subject), Rc::clone(a));
+                        let a = nock(Rc::clone(&subject), Rc::clone(a))?;
                         if let Content::Atom(a) = &a.content {
                             if let Content::Cell(c, d) = &b.content{
-                                match a.to_f64() as usize {
+                                return match a.to_f64() as usize {
                                     0 => nock(subject, Rc::clone(c)),
                                     1 => nock(subject, Rc::clone(d)),
-                                    _ => panic!("Invalid branch"),
-                                }
-                            } else {
-                                panic!("6");
-                            }
-                        }
-                        else {
-                            panic!("6");
+                                    _ =>  Err(NockError{msg: "5".to_string(),}),
+                                };
+                            } 
                         }
                     }
-                    else {
-                        panic!("6");
-                    }
+                    Err(NockError{
+                        msg: "6".to_string(),
+                    })
                 }
                 7 => {
                     if let Content::Cell(a, b) = &var.content {
-                        nock(nock(subject, Rc::clone(a)), Rc::clone(b))
+                        nock(nock(subject, Rc::clone(a))?, Rc::clone(b))
                     }
                     else {
-                        panic!("7");
+                        Err(NockError{
+                            msg: "7".to_string(),
+                        })
                     }
                 }
 //*[a 8 b c]          *[[*[a b] a] c]
@@ -134,24 +153,30 @@ pub fn nock(subject: Rc<Noun>, formula: Rc<Noun>) -> Rc<Noun> {
                     if let Content::Cell(a, b) = &var.content {
                         let noun = Noun {
                             hash: 472842,
-                            content: Content::Cell(nock(Rc::clone(&subject), Rc::clone(a)), subject),
+                            content: Content::Cell(nock(Rc::clone(&subject), Rc::clone(a))?, subject),
                         };
                         nock(Rc::new(noun), Rc::clone(b))
                     }
                     else {
-                        panic!(8);
+                        Err(NockError{
+                            msg: "8".to_string(),
+                        })
                     }
                 }
-                _ => {
-                    panic!("Invalid operator");
-                }
+                _ => Err(NockError {
+                        msg: "Invalid Operator".to_string()
+                    })
             }
         }
         else {
-            panic!("Patern match failed");
+            Err(NockError{
+                msg: "Opcode must be an atom".to_string(),
+            })
         }
     }
     else {
-        panic!("Patern match failed {}", formula);
+        Err(NockError{
+            msg: "Not enough Arguments".to_string(),
+        })
     }
 }
